@@ -71,6 +71,22 @@ typedef struct _mp_obj_socket_t {
 
 const mp_obj_type_t mp_type_socket;
 
+STATIC mp_obj_t mod_socket_getaddrinfo(size_t n_args, const mp_obj_t *args);
+
+// call getaddrinfo if addr_in is a tuple.
+static void _addr_in_from_tuple(mp_obj_t *addr_in) {
+    if (mp_obj_is_type(*addr_in, &mp_type_tuple)) {
+        mp_obj_tuple_t *tuple = MP_OBJ_FROM_PTR(*addr_in);
+        mp_obj_list_t *l = MP_OBJ_FROM_PTR(mod_socket_getaddrinfo(tuple->len, tuple->items));
+        if (l->len == 0) {
+            mp_raise_OSError(MP_ENOENT); // name or service not known
+        }
+        tuple = MP_OBJ_FROM_PTR(l->items[0]);
+        *addr_in = tuple->items[4];
+    }
+}
+
+
 // Helper functions
 static inline mp_obj_t mp_obj_from_sockaddr(const struct sockaddr *addr, socklen_t len) {
     return mp_obj_new_bytes((const byte *)addr, len);
@@ -157,6 +173,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_1(socket_fileno_obj, socket_fileno);
 
 STATIC mp_obj_t socket_connect(mp_obj_t self_in, mp_obj_t addr_in) {
     mp_obj_socket_t *self = MP_OBJ_TO_PTR(self_in);
+    _addr_in_from_tuple(&addr_in);
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(addr_in, &bufinfo, MP_BUFFER_READ);
     int r = connect(self->fd, (const struct sockaddr *)bufinfo.buf, bufinfo.len);
@@ -172,6 +189,7 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_2(socket_connect_obj, socket_connect);
 
 STATIC mp_obj_t socket_bind(mp_obj_t self_in, mp_obj_t addr_in) {
     mp_obj_socket_t *self = MP_OBJ_TO_PTR(self_in);
+    _addr_in_from_tuple(&addr_in);
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(addr_in, &bufinfo, MP_BUFFER_READ);
     int r = bind(self->fd, (const struct sockaddr *)bufinfo.buf, bufinfo.len);
@@ -288,6 +306,7 @@ STATIC mp_obj_t socket_sendto(size_t n_args, const mp_obj_t *args) {
         flags = MP_OBJ_SMALL_INT_VALUE(args[2]);
         dst_addr = args[3];
     }
+    _addr_in_from_tuple(&dst_addr);
 
     mp_buffer_info_t bufinfo, addr_bi;
     mp_get_buffer_raise(args[1], &bufinfo, MP_BUFFER_READ);
@@ -615,6 +634,10 @@ STATIC const mp_rom_map_elem_t mp_module_socket_globals_table[] = {
     C(SOCK_STREAM),
     C(SOCK_DGRAM),
     C(SOCK_RAW),
+    C(IPPROTO_TCP),
+    C(IPPROTO_UDP),
+    C(IPPROTO_IP),
+    C(IP_ADD_MEMBERSHIP),
 
     C(MSG_DONTROUTE),
     C(MSG_DONTWAIT),
