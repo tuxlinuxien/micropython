@@ -519,6 +519,10 @@ STATIC mp_obj_t mod_socket_getaddrinfo(size_t n_args, const mp_obj_t *args) {
     // TODO: Implement 5th and 6th args
 
     const char *host = mp_obj_str_get_str(args[0]);
+    // allow empty ip
+    if (strcmp(host, "") == 0) {
+        host = "0.0.0.0";
+    }
     const char *serv = NULL;
     struct addrinfo hints;
     char buf[6];
